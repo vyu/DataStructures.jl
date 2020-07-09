@@ -38,8 +38,8 @@ Base.isempty(D::CircularDeque) = D.n == 0
 Get the item at the front of the queue.
 """
 @inline function first(D::CircularDeque)
-    @boundscheck D.n > 0 || throw(BoundsError())
-    return D.buffer[D.first]
+    @boundscheck isempty(D) && Base.throw_boundserror(D, 1)
+    @inbounds return D.buffer[D.first]
 end
 
 """
@@ -48,25 +48,23 @@ end
 Get the item from the back of the queue.
 """
 @inline function last(D::CircularDeque)
-    @boundscheck D.n > 0 || throw(BoundsError())
-    return D.buffer[D.last]
+    @boundscheck isempty(D) && Base.throw_boundserror(D, 1)
+    @inbounds return D.buffer[D.last]
 end
 
 @inline function Base.push!(D::CircularDeque, v)
-    @boundscheck D.n < D.capacity || throw(BoundsError()) # prevent overflow
+    @boundscheck D.n < D.capacity || Base.throw_boundserror(D, D.n + 1)  # prevent overflow
+    D.last = (D.last == D.capacity ? 1 : D.last + 1)
     D.n += 1
-    tmp = D.last + 1
-    D.last = ifelse(tmp > D.capacity, 1, tmp)  # wraparound
     @inbounds D.buffer[D.last] = v
     return D
 end
 
-@inline function Base.pop!(D::CircularDeque)
+Base.@propagate_inbounds function Base.pop!(D::CircularDeque)
     v = last(D)
     D.n -= 1
-    tmp = D.last - 1
-    D.last = ifelse(tmp < 1, D.capacity, tmp)
-    v
+    D.last = (D.last == 1 ? D.capacity : D.last - 1)
+    return v
 end
 
 """
@@ -75,12 +73,11 @@ end
 Add an element to the front.
 """
 @inline function pushfirst!(D::CircularDeque, v)
-    @boundscheck D.n < D.capacity || throw(BoundsError())
+    @boundscheck D.n < D.capacity || Base.throw_boundserror(D, 0)
+    D.first = (D.first == 1 ? D.capacity : D.first - 1)
     D.n += 1
-    tmp = D.first - 1
-    D.first = ifelse(tmp < 1, D.capacity, tmp)
     @inbounds D.buffer[D.first] = v
-    D
+    return D
 end
 
 """
@@ -88,32 +85,24 @@ end
 
 Remove the element at the front.
 """
-@inline function popfirst!(D::CircularDeque)
+Base.@propagate_inbounds function popfirst!(D::CircularDeque)
     v = first(D)
     D.n -= 1
-    tmp = D.first + 1
-    D.first = ifelse(tmp > D.capacity, 1, tmp)
-    v
-end
-
-# getindex sans bounds checking
-@inline function _unsafe_getindex(D::CircularDeque, i::Integer)
-    j = D.first + i - 1
-    if j > D.capacity
-        j -= D.capacity
-    end
-    @inbounds ret = D.buffer[j]
-    return ret
+    D.first = (D.first == D.capacity ? 1 : D.first + 1)
+    return v
 end
 
 @inline function Base.getindex(D::CircularDeque, i::Integer)
-    @boundscheck 1 <= i <= D.n || throw(BoundsError())
-    return _unsafe_getindex(D, i)
+    @boundscheck 1 <= i <= D.n || Base.throw_boundserror(D, i)
+    cap = D.capacity
+    j = D.first + i - 1
+    k = (j > cap ? j - cap : j)
+    @inbounds return D.buffer[k]
 end
 
 # Iteration via getindex
-@inline function iterate(d::CircularDeque, i = 1)
-    i == d.n + 1 ? nothing : (_unsafe_getindex(d, i), i+1)
+@inline function iterate(D::CircularDeque, i=1)
+    @inbounds return i == D.n + 1 ? nothing : (D[i], i + 1)
 end
 
 @inline function iterate(R::Iterators.Reverse{<:CircularDeque}, i=length(R))

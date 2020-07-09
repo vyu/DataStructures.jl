@@ -116,6 +116,14 @@ end
     i == d.n + 1 ? nothing : (_unsafe_getindex(d, i), i+1)
 end
 
+@inline function iterate(R::Iterators.Reverse{<:CircularDeque}, i=length(R))
+    @inbounds return i == 0 ? nothing : (R.itr[i], i - 1)
+end
+
+# Necessary for compatibility with Julia 1.0, which uses lastindex instead of
+# Iterators.Reverse in foldr. Also useful in general.
+lastindex(D::CircularDeque) = D.n
+
 function Base.show(io::IO, D::CircularDeque{T}) where T
     print(io, "CircularDeque{$T}([")
     for i = 1:length(D)

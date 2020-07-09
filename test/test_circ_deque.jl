@@ -81,6 +81,14 @@
         for i in 1:5 push!(D, i) end
         @test collect([i for i in D]) == collect(1:5)
     end
+
+    @testset "reverse iteration" begin
+        D = CircularDeque{Int}(5)
+        for i in 1:5 push!(D, i) end
+        @test collect(Iterators.reverse(D)) == collect(5:-1:1)
+        @test foldr(+, D) == sum(1:5)
+        @test lastindex(D) == 5
+    end
 end
 
 nothing

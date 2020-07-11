@@ -102,6 +102,9 @@ module DataStructures
         isfull
     include("circular_buffer.jl")
 
+    export RingBuffer, capacity, force_push!, force_pushfirst!, isfull
+    include("ring_buffer.jl")
+
     export status
     export deref_key, deref_value, deref, advance, regress
 
